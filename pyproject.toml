@@ -1,0 +1,74 @@
+[project]
+name = "smhc"
+version = "1.0.0"
+description = "Unofficial high-performance python package for strand-accurate multi-view hair capture (Nam et al., CVPR2019)"
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["strand-accurate hair", "multi-view reconstruction", "pytorch", "cuda"]
+
+dependencies = [
+    "numpy>=2.0",
+    "torch>=2.4",
+    "jaxtyping",
+    "beartype",
+    "rich",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "pylint",
+    "pytest",
+    "typeguard==2.13.3",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Allrez/SMHC-Unofficial-Pytorch"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310', 'py311', 'py312']
+skip-magic-trailing-comma = false
+skip-string-normalization = false
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | venv
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+force-exclude = '\.(cu|cpp|h|yaml|yml|toml|git)$'
+# exclude the entire third_party directory
+extend-exclude = 'third_party/'
+
+[tool.isort]
+# "black" profile ensures isort doesn't fight with Black's formatting rules
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+# tell isort to ignore this folder
+skip_glob = ["third_party/*"]
+
+[tool.pylint.format]
+max-line-length = "88"
+
+[tool.pylint.messages_control]
+# Disable specific linting rules that overlap/conflict with Black's auto-formatting
+disable = [
+    "C0330", # Wrong hanging indentation
+    "C0326", # Bad whitespace
+    "E1101", # Maybe-no-member (Often triggers false positives with PyTorch/C++ backends)
+]

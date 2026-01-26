@@ -1,0 +1,6 @@
+[submodule "src/smhc/cuda/csrc/third_party/cudaKDTree"]
+	path = src/smhc/cuda/csrc/third_party/cudaKDTree
+	url = https://github.com/ingowald/cudaKDTree
+[submodule "src/smhc/cuda/csrc/third_party/eigen"]
+	path = src/smhc/cuda/csrc/third_party/eigen
+	url = https://github.com/PX4/eigen

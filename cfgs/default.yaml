@@ -1,0 +1,68 @@
+# needed additional directories to save results
+ori2d_maps_dir:           "ori"
+conf_maps_dir:            "conf"
+estimates_dir:            "lpmvs_results"
+int_maps_dir:             "int"
+filtered_dir:             "filtered"
+fused_dir:                "fused"
+strand_segments_dir:      "strand_segments"
+multiview_growing_dir:    "multiview_hairgrowing"
+
+# parameters to select the neighboring views
+neighboring_views_mimimum_angle_diff:   5.
+neighboring_views_maximum_angle_diff:   25.
+maximum_neighboring_views_num:          9
+
+# Orientation calculation parameters
+kernel_size:           31
+highpass_sigma:        0.4
+lowpass_sigma:         10.
+# Gabor filter parameters
+gb_lambda:             4.
+gb_phase:              0.
+gb_sigma_x:            1.8
+gb_sigma_y:            2.4
+gb_kernels_num:        180
+gb_kernel_size:        17
+
+# lpmvs parameters
+lpmvs_alpha:                       0.1
+lpmvs_iterations:                  8
+lpmvs_minimum_depth:               0.4
+lpmvs_maximum_depth:               1.4
+lpmvs_sampling_radius:             10.
+lpmvs_samples_num:                 40
+lpmvs_occlusion_depth_thresh:      0.001
+
+# line filtering parameters
+line_filtering_position_consistency_thres:                0.001
+line_filtering_direction_diff_threshold_rad:              0.17453292519943295 # 10.*np.pi/180.0
+line_filtering_consistent_neighboring_views_threshold:    2
+
+# line fusion parameters
+line_fusion_position_update_threshold:  0.00002
+line_fusion_search_radius:              0.002
+line_fusion_sigma_pos:                  0.0002
+line_fusion_sigma_dir:                  0.5235987755982988 # np.pi/6.
+
+# strand segment generation parameters
+strand_generation_step_size:                        0.0002 # 0.0001
+strand_generation_length_threshold:                 0.002 # 2mm
+strand_generation_neighboring_radius:               0.0002
+strand_generation_angle_difference_threshold_rad:   0.5235987755982988 # np.pi/6.
+
+# multi-view hair growing parameters
+mvhg_reset_valid_views_period:                        20 # this variable specifies the priod which the neighboring views with valid growing direction are selected, you can set it to 1, but it will result in a longer runtime for the algorithm.
+mvhg_max_iter_num:                                    1000
+mvhg_background_ratio:                                0.9
+mvhg_search_cone_opening_angle_rad:                   0.08726646259971647 # 5.*np.pi/180.
+mvhg_search_cone_angular_resolution_rad:              0.017453292519943295 # 1.*np.pi/180.
+mvhg_search_cone_window_width:                        3.
+mvhg_search_cone_window_height:                       10.
+mvhg_orientation_2d_confidence_threshold:             3.
+mvhg_orientation_2d_angle_difference_threshold_rad:   0.08726646259971647 # 5.*np.pi/180.
+mvhg_valid_pixels_number_threshold:                   10
+mvhg_minimum_views_with_valid_2d_direction:           6
+mvhg_growing_step_size:                               0.0003 # this value should be a bit more than length of a pixel
+mvhg_direction_change_threshold_rad:                  0.7853981633974483 # 45.*np.pi/180.
+mvhg_background_color_threshold:                      0.011764705882352941 # 3./255.

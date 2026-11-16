@@ -6,6 +6,7 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
+from datasets.colmap import is_colmap_dataset, load_colmap_calibration
 from utils.camera_utils import Camera
 from utils.gabor import GaborFilterBank
 from utils.graphics_utils import get_plucker_line_coordinates
@@ -32,8 +33,21 @@ class Dataset:
                 f"Only picking every {pick_every_nth_camera}-th of the cameras for further processing!"
             )
 
-        with open(os.path.join(args.dataset_path, calibration_file)) as json_file:
-            calib_data = json.load(json_file)
+        colmap_input = is_colmap_dataset(args.dataset_path)
+        args.input_unit_scale = 0.001 if colmap_input else 1.0
+        if colmap_input:
+            calib_data, depth_range = load_colmap_calibration(args.dataset_path)
+            if args.lpmvs_minimum_depth is None:
+                args.lpmvs_minimum_depth = depth_range[0]
+            if args.lpmvs_maximum_depth is None:
+                args.lpmvs_maximum_depth = depth_range[1]
+            print(
+                "COLMAP input (mm -> m); LPMVS depth range: "
+                f"{args.lpmvs_minimum_depth:.3f}–{args.lpmvs_maximum_depth:.3f} m"
+            )
+        else:
+            with open(os.path.join(args.dataset_path, calibration_file)) as json_file:
+                calib_data = json.load(json_file)
 
         self.views = []
         self.total_views_num = len(calib_data["cameras"])
@@ -100,7 +114,21 @@ class Dataset:
                 get_plucker_line_coordinates(P[0, :], P[1, :])
             )
 
-            if imgs_name_trailing_zeros == 5:
+            if colmap_input:
+                image_name = os.path.splitext(c["image_name"])[0]
+                image_path = os.path.join(
+                    args.dataset_path, "cropped/images", c["image_name"]
+                )
+                depth_arr_path = os.path.join(
+                    args.dataset_path, "depth", f"{image_name}.npy"
+                )
+                hair_mask_path = os.path.join(
+                    args.dataset_path, args.hair_masks, f"{image_name}.png"
+                )
+                body_mask_path = os.path.join(
+                    args.dataset_path, "body", f"{image_name}.png"
+                )
+            elif imgs_name_trailing_zeros == 5:
                 image_path = os.path.join(
                     args.dataset_path,
                     f"{imgs_folder}/{imgs_name_prefix}{u_id:05d}{extension}",
@@ -151,6 +179,8 @@ class Dataset:
                 )
 
             if not os.path.exists(image_path):
+                if colmap_input:
+                    raise FileNotFoundError(image_path)
                 print(f"Could not find input image, {image_path}.")
                 checked_views += 1
                 continue
@@ -158,6 +188,14 @@ class Dataset:
             gt_image_np = np.array(
                 Image.open(image_path).convert("L"), dtype=np.float32
             ) * (1.0 / 255.0)
+            if (
+                colmap_input
+                and list(gt_image_np.shape) != c["intrinsics"]["resolution"]
+            ):
+                raise ValueError(
+                    f"Image size for {image_path} does not match cameras.bin; "
+                    "provide intrinsics for the cropped images."
+                )
 
             if mask_images_using_alpha:
                 if os.path.exists(body_mask_path):
@@ -190,10 +228,13 @@ class Dataset:
                 hair_mask_np[hair_mask_np > 0.01] = 1.0
                 hair_mask_np[hair_mask_np < 0.01] = 0.0
             else:
-                print(f"Could not find input hair mask, {hair_mask_path}.")
+                if not colmap_input:
+                    print(f"Could not find input hair mask, {hair_mask_path}.")
                 hair_mask_np = np.ones_like(gt_image_np, dtype=np.float32)
 
-            int_map_file = os.path.join(args.output_path, f"int/int_map_{u_id:06d}.npy")
+            int_map_file = os.path.join(
+                args.work_path, f"{args.int_maps_dir}/int_map_{u_id:06d}.npy"
+            )
             if os.path.exists(int_map_file):
                 with open(int_map_file, "rb") as f:
                     int_map_np = np.load(f)
@@ -227,16 +268,16 @@ class Dataset:
                             )
                         )
                     )
-                int_map = torch.cat(int_map, dim=0)
+                int_map = torch.stack(int_map, dim=0)
 
             # calculate the 2d orientaion and confidence maps
             # check if 2d orienation map is already calculated, if this is the case load it
             # otherwise calculate the 2d orientation and confidence maps and save them in the specified directories
             ori2d_map_file = os.path.join(
-                args.output_path, f"{args.ori2d_maps_dir}/img_{u_id:06d}.npy"
+                args.work_path, f"{args.ori2d_maps_dir}/img_{u_id:06d}.npy"
             )
             conf_map_file = os.path.join(
-                args.output_path, f"{args.conf_maps_dir}/img_{u_id:06d}.npy"
+                args.work_path, f"{args.conf_maps_dir}/img_{u_id:06d}.npy"
             )
 
             if os.path.isfile(ori2d_map_file):

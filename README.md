@@ -137,6 +137,45 @@ chmod +x install.sh
 ```
 
 ## 💻 Usage
+### Common COLMAP input
+
+Cases under `input/real` and `input/synth/ct2hair` can be used directly:
+
+```text
+<case_dir>/
+├── cropped/images/    # Names referenced by sparse/images.bin, e.g. 0.jpg
+├── sparse/
+│   ├── cameras.bin
+│   ├── images.bin
+│   └── points3D.bin
+└── head.obj
+```
+
+Run from the repository root in the installed Python environment:
+
+```bash
+python main.py --dataset_path input/real/20260415/iwata
+python main.py --dataset_path input/synth/ct2hair/bangs
+```
+
+The output path defaults to `output/<path relative to input>/`, e.g.
+`output/real/20260415/iwata/`. Final results are
+`multiview_hairgrowing/final_positions.npy`, `final_directions.npy`, and
+`final_points_num_per_strand.npy` within that directory. All intermediate maps,
+point clouds, strand segments, and `cfg.yaml` are stored under its `work/`
+subdirectory. `--output_path` can still override the output directory; resumed
+runs and `--initial_depth_maps` use the same `work/` layout.
+
+The loader supports undistorted COLMAP `PINHOLE` and `SIMPLE_PINHOLE` cameras.
+Their intrinsics must match the cropped images. Camera translations and the head
+mesh are interpreted in millimetres; computation uses metres, and final positions
+are saved in millimetres with the input axes unchanged (+Y up, +Z front, +X toward
+the model's left). `head.obj` determines the default depth search range with a
+150 mm margin. Override it with `--lpmvs_minimum_depth` and
+`--lpmvs_maximum_depth` in **metres** if needed. Hair masks and ground-truth hair
+are optional; `points3D.bin` is not needed by the reconstruction algorithm.
+Existing `calibration.json` datasets remain supported in their original units.
+
 ### Step 1: Synthetic Data Generation
 Before reconstruction, you can generate the multi-view synthetic dataset using the provided Blender script. This provides 136 viewpoints per model, on a geodesic shell covering mostly the upper hemisphere, at 2048x2048 resolution. Currently .hair, .ply and .bin hair models are supported. For the head model, provide a .ply model and make sure to use a closed (capped) neck on your head model. This prevents the pipeline from reconstructing internal strands that are technically visible through the open hole at the bottom of a standard bust mesh.
 

@@ -62,6 +62,10 @@ def compute_quantitative_measures_pc_comparison(args):
     with open(final_estimated_directions_path, "rb") as f:
         final_estimated_directions_np = np.load(f)
 
+    # Common COLMAP inputs and final outputs are in mm; thresholds remain in m.
+    gt_positions_np = gt_positions_np * args.input_unit_scale
+    final_estimated_positions_np = final_estimated_positions_np * args.input_unit_scale
+
     gt_positions_torch = torch.from_numpy(gt_positions_np).to(torch.float32)
     gt_directions_torch = torch.from_numpy(gt_directions_np).to(torch.float32)
 

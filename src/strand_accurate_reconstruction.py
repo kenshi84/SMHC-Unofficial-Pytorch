@@ -29,7 +29,7 @@ class SAR:
             hair_mask = self.dataset.views[view_idx].gt_hair_mask
 
         idm_file = os.path.join(
-            self.params.output_path,
+            self.params.work_path,
             f"{self.params.initial_depth_maps}/img_{self.dataset.views[view_idx].u_id:06d}.npy",
         )
         if os.path.isfile(idm_file):
@@ -162,13 +162,13 @@ class SAR:
 
             # saving the results
             pos_file = os.path.join(
-                self.params.output_path,
+                self.params.work_path,
                 f"{self.params.estimates_dir}/pos_img_{viewpoint_cam.u_id:06d}.npy",
             )
             with open(pos_file, "wb") as f:
                 np.save(f, poses.cpu().permute(1, 2, 0).numpy())
             dir_file = os.path.join(
-                self.params.output_path,
+                self.params.work_path,
                 f"{self.params.estimates_dir}/dir_img_{viewpoint_cam.u_id:06d}.npy",
             )
             with open(dir_file, "wb") as f:
@@ -207,7 +207,7 @@ class SAR:
         # getting reliable estimated positions and directions from int maps
         for idx, viewpoint_cam in enumerate(self.dataset.views):
             int_map_file = os.path.join(
-                self.params.output_path,
+                self.params.work_path,
                 f"{self.params.int_maps_dir}/int_map_{viewpoint_cam.u_id:06d}.npy",
             )
             with open(int_map_file, "rb") as f:
@@ -295,11 +295,11 @@ class SAR:
             # load the estimated positions and directions
             # in case of applying strand integration load the optimized results
             pos_file = os.path.join(
-                self.params.output_path,
+                self.params.work_path,
                 f"{self.params.estimates_dir}/pos_img_{viewpoint_cam.u_id:06d}.npy",
             )
             dir_file = os.path.join(
-                self.params.output_path,
+                self.params.work_path,
                 f"{self.params.estimates_dir}/dir_img_{viewpoint_cam.u_id:06d}.npy",
             )
 
@@ -334,11 +334,11 @@ class SAR:
                 # load the estimated positions and directions
                 # in case of applying strand integration load the optimized results
                 pos_file = os.path.join(
-                    self.params.output_path,
+                    self.params.work_path,
                     f"{self.params.estimates_dir}/pos_img_{self.dataset.views[nv].u_id:06d}.npy",
                 )
                 dir_file = os.path.join(
-                    self.params.output_path,
+                    self.params.work_path,
                     f"{self.params.estimates_dir}/dir_img_{self.dataset.views[nv].u_id:06d}.npy",
                 )
 
@@ -394,14 +394,14 @@ class SAR:
             )
             consistency_img.save(
                 os.path.join(
-                    self.params.output_path,
+                    self.params.work_path,
                     f"{self.params.filtered_dir}/acc_img_{viewpoint_cam.u_id:06d}.png",
                 )
             )
 
             # saving the int maps for later
             int_map_file = os.path.join(
-                self.params.output_path,
+                self.params.work_path,
                 f"{self.params.int_maps_dir}/int_map_{viewpoint_cam.u_id:06d}.npy",
             )
             with open(int_map_file, "wb") as f:
@@ -414,7 +414,7 @@ class SAR:
             self.extract_positions_and_directions_from_int_maps()
         )
         filtered_results_dir = os.path.join(
-            self.params.output_path, self.params.filtered_dir
+            self.params.work_path, self.params.filtered_dir
         )
         with open(
             os.path.join(filtered_results_dir, "filtered_positions.npy"), "wb"
@@ -432,7 +432,7 @@ class SAR:
         """
         # load the filtered positions and directions
         estimates_dir = os.path.join(
-            self.params.output_path, f"{self.params.filtered_dir}"
+            self.params.work_path, f"{self.params.filtered_dir}"
         )
         with open(os.path.join(estimates_dir, "filtered_positions.npy"), "rb") as f:
             filtered_positions_np = np.load(f)
@@ -454,7 +454,7 @@ class SAR:
         )
 
         # saving the fused output point cloud
-        fused_results_dir = os.path.join(self.params.output_path, self.params.fused_dir)
+        fused_results_dir = os.path.join(self.params.work_path, self.params.fused_dir)
         with open(os.path.join(fused_results_dir, "fused_positions.npy"), "wb") as f:
             np.save(f, fused_positions.clone().numpy())
         with open(os.path.join(fused_results_dir, "fused_directions.npy"), "wb") as f:
@@ -465,7 +465,7 @@ class SAR:
         Generate strand segments from the fused point cloud.
         """
         # load the fused positions and directions
-        fused_results_dir = os.path.join(self.params.output_path, self.params.fused_dir)
+        fused_results_dir = os.path.join(self.params.work_path, self.params.fused_dir)
         with open(os.path.join(fused_results_dir, "fused_positions.npy"), "rb") as f:
             fused_positions_np = np.load(f)
         with open(os.path.join(fused_results_dir, "fused_directions.npy"), "rb") as f:
@@ -487,7 +487,7 @@ class SAR:
 
         # saving the generated strand segments
         results_dir = os.path.join(
-            self.params.output_path, self.params.strand_segments_dir
+            self.params.work_path, self.params.strand_segments_dir
         )
         with open(os.path.join(results_dir, "segments_positions.npy"), "wb") as f:
             np.save(f, segments_positions.clone().numpy())
@@ -504,7 +504,7 @@ class SAR:
         """
         # loading the initial strand segments
         strand_segments_dir = os.path.join(
-            self.params.output_path, self.params.strand_segments_dir
+            self.params.work_path, self.params.strand_segments_dir
         )
         with open(
             os.path.join(strand_segments_dir, "segments_positions.npy"), "rb"
@@ -556,7 +556,9 @@ class SAR:
         with open(
             os.path.join(multiview_growing_results_dir, "final_positions.npy"), "wb"
         ) as f:
-            np.save(f, final_positions.clone().numpy()[:, :3])
+            np.save(
+                f, final_positions.clone().numpy()[:, :3] / self.params.input_unit_scale
+            )
 
         with open(
             os.path.join(multiview_growing_results_dir, "final_directions.npy"), "wb"

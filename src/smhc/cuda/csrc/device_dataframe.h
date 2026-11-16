@@ -1,6 +1,7 @@
 #ifndef DEVICE_DATAFRAME_H_INCLUDED
 #define DEVICE_DATAFRAME_H_INCLUDED
 
+#include <stdint.h>
 #include <cuda_runtime.h>
 #include <cuda_texture_types.h>
 #include <curand_kernel.h>

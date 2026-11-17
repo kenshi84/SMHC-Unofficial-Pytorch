@@ -64,7 +64,7 @@ mvhg_search_cone_window_height:                       10.
 mvhg_orientation_2d_confidence_threshold:             3.
 mvhg_orientation_2d_angle_difference_threshold_rad:   0.08726646259971647 # 5.*np.pi/180.
 mvhg_valid_pixels_number_threshold:                   10
-mvhg_minimum_views_with_valid_2d_direction:           6
+mvhg_minimum_views_with_valid_2d_direction:           6 # also the minimum foreground-supporting views, with or without masks
 mvhg_growing_step_size:                               0.0003 # this value should be a bit more than length of a pixel
 mvhg_direction_change_threshold_rad:                  0.7853981633974483 # 45.*np.pi/180.
-mvhg_background_color_threshold:                      0.011764705882352941 # 3./255.
+mvhg_background_color_threshold:                      0.011764705882352941 # 3./255.; minimum unmasked intensity for a view to supply foreground support

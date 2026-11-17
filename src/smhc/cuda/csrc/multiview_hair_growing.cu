@@ -57,8 +57,9 @@ inline bool has_foreground_support(
     const int required_views = std::max(1, minimum_views);
     for (int cam_idx = 0; cam_idx < total_views_num; ++cam_idx)
     {
-        const float* hair_mask = hdf->imgs_mask_cpu[cam_idx];
-        if (use_hair_masks && hair_mask == nullptr)
+        const float* foreground_image = use_hair_masks
+            ? hdf->imgs_mask_cpu[cam_idx] : hdf->imgs_gray_cpu[cam_idx];
+        if (foreground_image == nullptr)
             continue;
 
         float3 pixel_coord;
@@ -67,21 +68,17 @@ inline bool has_foreground_support(
 
         const int pixel_index = int(std::floor(pixel_coord.y)) * hdf->cols
             + int(std::floor(pixel_coord.x));
-        if (use_hair_masks)
-        {
-            // A disagreeing silhouette must not veto support from enough views.
-            if (hair_mask[pixel_index] > hair_mask_foreground_threshold
-                && ++foreground_views >= required_views)
-                return true;
-        }
-        else if (hdf->imgs_gray_cpu[cam_idx][pixel_index] < background_color_threshold)
-        {
-            return false;
-        }
+        const float value = foreground_image[pixel_index];
+        const bool foreground = use_hair_masks
+            ? value > hair_mask_foreground_threshold
+            : std::isfinite(value) && value >= background_color_threshold;
+        // A dark view or disagreeing silhouette cannot veto sufficient support.
+        if (foreground && ++foreground_views >= required_views)
+            return true;
     }
 
-    // Without masks, preserve the existing intensity-based background test.
-    return !use_hair_masks;
+    // Unobserved points and points with insufficient evidence are unsupported.
+    return false;
 }
 
 inline float calc_strand_length(

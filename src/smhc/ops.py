@@ -403,9 +403,12 @@ def run_multiview_hair_growing(
     If CPU hair masks have been loaded, orientation samples are restricted to
     their foreground pixels (mask > 0.01). Growth and final background removal
     require foreground support from at least
-    params.minimum_views_with_valid_2d_direction masked views (minimum one).
+    params.minimum_views_with_valid_2d_direction views (minimum one).
     Only finite, in-frame projections in front of a camera count as support.
-    Without masks, background checks use params.background_color_threshold.
+    Without masks, a view supplies support when its intensity is finite and
+    at least params.background_color_threshold. Dark or unobserved views do
+    not veto sufficient support from other views. With masks, only foreground
+    mask pixels supply support, regardless of image intensity.
     params.background_ratio is the fraction of unsupported vertices at which
     a strand is removed during the final check.
 

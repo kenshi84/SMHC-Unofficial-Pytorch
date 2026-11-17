@@ -196,8 +196,15 @@ strands. A point needs support from at least
 Only finite, in-frame projections in front of a camera count; disagreements in
 other masks do not veto sufficient support. `mvhg_background_ratio` still sets
 the fraction of unsupported **strand vertices** at which the final check removes
-a strand. Without masks, growing retains the intensity-based background check
-using `mvhg_background_color_threshold`.
+a strand.
+
+Without masks, growth and final filtering require the same minimum number of
+supporting views. A view supplies support when the point projects in front of
+the camera, inside its image, and its finite grayscale intensity is at least
+`mvhg_background_color_threshold` (default: 3/255). Dark views do not veto support
+from other views. Points with too few supporting views, including points outside
+every image, are rejected. These intensity checks assume a dark background;
+hair masks provide foreground evidence even when the hair itself is dark.
 
 To export the final positions and strand lengths to `final.data` and `final.ply`
 in the same directory, with `hairutil` available on `PATH`:

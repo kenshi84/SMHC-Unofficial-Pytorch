@@ -49,7 +49,10 @@ def grow_horizontal_strand(
     # These tensors must stay alive: the growing stage borrows their CPU storage.
     if image_values is None:
         image_values = [1.0] * total_views
-    images = [torch.full((size, size), value) for value in image_values]
+    images = [
+        torch.as_tensor(value, dtype=torch.float32).expand(size, size).contiguous()
+        for value in image_values
+    ]
     orientation = torch.full((size, size), orientation_angle)
     confidence = (
         torch.as_tensor(confidence_value, dtype=torch.float32)
@@ -315,10 +318,13 @@ def test_mask_support_uses_the_configured_view_count(
     [(0.0, 0.0, 2.0), (0.0, 5.0, 0.0), (0.0, 0.0, 1.0)],
     ids=["behind", "offscreen", "zero-depth"],
 )
-def test_unprojectable_views_do_not_supply_mask_support(smhc_module, invalid_camera):
+@pytest.mark.parametrize("use_masks", [False, True], ids=["unmasked", "masked"])
+def test_unprojectable_views_do_not_supply_foreground_support(
+    smhc_module, invalid_camera, use_masks
+):
     positions, _, counts = grow_horizontal_strand(
         smhc_module,
-        hair_masks=[torch.ones((64, 64))] * 3,
+        hair_masks=[torch.ones((64, 64))] * 3 if use_masks else None,
         camera_centers=[(0.0, -0.25, 0.0), (0.0, 0.25, 0.0), invalid_camera],
         only_background_removal=True,
     )
@@ -349,6 +355,70 @@ def test_unmasked_dark_background_still_gets_removed(
         smhc_module,
         image_values=[0.0] * 3,
         only_background_removal=only_background_removal,
+    )
+
+    assert counts.numel() == positions.numel() == 0
+
+
+@pytest.mark.parametrize("only_background_removal", [False, True])
+@pytest.mark.parametrize("minimum_views", [2, 3])
+@pytest.mark.parametrize("dark_camera", [0, 2], ids=["dark-first", "dark-last"])
+def test_unmasked_foreground_survives_dark_views_when_support_is_sufficient(
+    smhc_module, only_background_removal, minimum_views, dark_camera
+):
+    image_values = [1.0] * 3
+    image_values[dark_camera] = 0.0
+    positions, _, counts = grow_horizontal_strand(
+        smhc_module,
+        image_values=image_values,
+        minimum_views=minimum_views,
+        only_background_removal=only_background_removal,
+    )
+
+    expected_count = (2 if only_background_removal else 4) if minimum_views == 2 else 0
+    assert positions.shape[0] == expected_count
+    assert counts.tolist() == ([float(expected_count)] if expected_count else [])
+
+
+@pytest.mark.parametrize(
+    "intensity,expected_count",
+    [(0.01, 2), (0.009, 0), (float("nan"), 0), (float("inf"), 0)],
+    ids=["at-threshold", "below-threshold", "nan", "infinite"],
+)
+def test_unmasked_support_requires_finite_intensity_at_the_threshold(
+    smhc_module, intensity, expected_count
+):
+    positions, _, counts = grow_horizontal_strand(
+        smhc_module,
+        image_values=[intensity, 1.0, 1.0],
+        only_background_removal=True,
+    )
+
+    assert positions.shape[0] == expected_count
+    assert counts.tolist() == ([float(expected_count)] if expected_count else [])
+
+
+def test_unmasked_growing_stops_before_entering_dark_background(smhc_module):
+    image = torch.zeros((64, 64))
+    image[:, 31:33] = 1.0
+    positions, _, counts = grow_horizontal_strand(
+        smhc_module,
+        image_values=[image] * 3,
+        growing_step=0.02,
+    )
+
+    assert counts.tolist() == [2.0]
+    torch.testing.assert_close(
+        positions[:, :3], torch.tensor([[-0.01, 0.0, 1.0], [0.01, 0.0, 1.0]])
+    )
+
+
+def test_unmasked_points_outside_every_view_are_removed(smhc_module):
+    positions, _, counts = grow_horizontal_strand(
+        smhc_module,
+        camera_centers=[(0.0, 5.0, 0.0)] * 3,
+        minimum_views=1,
+        only_background_removal=True,
     )
 
     assert counts.numel() == positions.numel() == 0

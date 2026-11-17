@@ -1,4 +1,5 @@
 #include <omp.h>
+#include <algorithm>
 #include <sstream>
 #include <vector>
 #include <fstream>
@@ -22,6 +23,66 @@
 
 namespace solution::multiview_hair_growing
 {
+
+constexpr float hair_mask_foreground_threshold = 0.01f;
+
+inline bool project_to_image(
+    const host_dataframe* hdf,
+    const int cam_idx,
+    const float4& position,
+    float3& pixel_coord
+)
+{
+    matvecmul4_hom(hdf->P_cpu[cam_idx], position, pixel_coord);
+    if (!std::isfinite(pixel_coord.z) || pixel_coord.z <= 0.f)
+        return false;
+
+    pixel_coord.x /= pixel_coord.z;
+    pixel_coord.y /= pixel_coord.z;
+    return std::isfinite(pixel_coord.x) && std::isfinite(pixel_coord.y)
+        && pixel_coord.x >= 0.f && pixel_coord.x < hdf->cols
+        && pixel_coord.y >= 0.f && pixel_coord.y < hdf->rows;
+}
+
+inline bool has_foreground_support(
+    const host_dataframe* hdf,
+    const int total_views_num,
+    const float4& position,
+    const int minimum_views,
+    const float background_color_threshold,
+    const bool use_hair_masks
+)
+{
+    int foreground_views = 0;
+    const int required_views = std::max(1, minimum_views);
+    for (int cam_idx = 0; cam_idx < total_views_num; ++cam_idx)
+    {
+        const float* hair_mask = hdf->imgs_mask_cpu[cam_idx];
+        if (use_hair_masks && hair_mask == nullptr)
+            continue;
+
+        float3 pixel_coord;
+        if (!project_to_image(hdf, cam_idx, position, pixel_coord))
+            continue;
+
+        const int pixel_index = int(std::floor(pixel_coord.y)) * hdf->cols
+            + int(std::floor(pixel_coord.x));
+        if (use_hair_masks)
+        {
+            // A disagreeing silhouette must not veto support from enough views.
+            if (hair_mask[pixel_index] > hair_mask_foreground_threshold
+                && ++foreground_views >= required_views)
+                return true;
+        }
+        else if (hdf->imgs_gray_cpu[cam_idx][pixel_index] < background_color_threshold)
+        {
+            return false;
+        }
+    }
+
+    // Without masks, preserve the existing intensity-based background test.
+    return !use_hair_masks;
+}
 
 inline float calc_strand_length(
     const std::vector<pc_structs::plain>& strand
@@ -59,6 +120,7 @@ void validate_directional_window(
     const bool& search_downwards,
     const float* orientation_image,
     const float* confidence_image,
+    const float* hair_mask,
     const int imgs_rows,
     const int imgs_cols,
     //
@@ -98,6 +160,9 @@ void validate_directional_window(
             }
 
             int p_index = sample.y * imgs_cols + sample.x;
+            if (hair_mask != nullptr && !(hair_mask[p_index] > hair_mask_foreground_threshold))
+                continue;
+
             float image_2d_ori_angle = orientation_image[p_index];
             float image_2d_conf = confidence_image[p_index];
 
@@ -115,8 +180,8 @@ void validate_directional_window(
         
     }
 
-    is_valid = valid_pixels_num > valid_pixels_number_threshold;
-    window_score /= valid_pixels_num;
+    is_valid = valid_pixels_num > 0 && valid_pixels_num > valid_pixels_number_threshold;
+    window_score = valid_pixels_num > 0 ? window_score / valid_pixels_num : FLT_MAX;
 
 }
 
@@ -197,14 +262,14 @@ void find_valid_3d_growing_direction(
         }
 
         float3 pixel_coord;
-        matvecmul4_hom(hdf->P_cpu[cam_idx], tip_position, pixel_coord);
-        pixel_coord.x /= pixel_coord.z;
-        pixel_coord.y /= pixel_coord.z;
-
         float3 next_pixel_coord;
-        matvecmul4_hom(hdf->P_cpu[cam_idx], next_to_tip_position, next_pixel_coord);
-        next_pixel_coord.x /= next_pixel_coord.z;
-        next_pixel_coord.y /= next_pixel_coord.z;
+        if (!project_to_image(hdf, cam_idx, tip_position, pixel_coord)
+            || !project_to_image(hdf, cam_idx, next_to_tip_position, next_pixel_coord))
+        {
+            if (already_picked_valid_views)
+                valid_views_cam_idx.erase(cam_idx_pos_in_already_picked_valid_views);
+            continue;
+        }
 
         bool downward_dir = next_pixel_coord.x < pixel_coord.x;
 
@@ -239,6 +304,7 @@ void find_valid_3d_growing_direction(
                 downward_dir,
                 hdf->imgs_ori_cpu[cam_idx],
                 hdf->imgs_conf_cpu[cam_idx],
+                hdf->imgs_mask_cpu[cam_idx],
                 hdf->rows,
                 hdf->cols,
                 //
@@ -353,7 +419,8 @@ void check_strand_tip(
     const int minimum_views_with_valid_2d_direction,
     const float growing_step_size,
     const float direction_change_threshold_rad,
-    const float background_color_threshold
+    const float background_color_threshold,
+    const bool use_hair_masks
 )
 {
 
@@ -453,32 +520,14 @@ void check_strand_tip(
             new_tip.y += growing_dir.y * growing_step_size;
             new_tip.z += growing_dir.z * growing_step_size;
 
-            // check if we ended up in background
-            for (int cam_idx = 0; cam_idx < total_views_num; ++cam_idx)
-            {
-
-                float3 pixel_coord;
-                matvecmul4_hom(hdf->P_cpu[cam_idx], new_tip, pixel_coord);
-
-                pixel_coord.x /= pixel_coord.z;
-                pixel_coord.y /= pixel_coord.z;
-
-                if (pixel_coord.y < 0 || pixel_coord.y >= hdf->rows || pixel_coord.x < 0 || pixel_coord.x >= hdf->cols)
-                {
-                    // valid_growing_dir = false;
-                    // break;
-                    continue;
-                }
-
-                int pixel_index = (int)(std::floor(pixel_coord.y)) * hdf->cols + (int)(std::floor(pixel_coord.x));
-                float pixel_gray_scale_value = hdf->imgs_gray_cpu[cam_idx][pixel_index];
-
-                if (pixel_gray_scale_value < background_color_threshold)
-                {
-                    valid_growing_dir = false;
-                    break;
-                }
-            }
+            valid_growing_dir = has_foreground_support(
+                hdf,
+                total_views_num,
+                new_tip,
+                minimum_views_with_valid_2d_direction,
+                background_color_threshold,
+                use_hair_masks
+            );
 
             if (valid_growing_dir)
             {
@@ -532,6 +581,15 @@ int run(
 )
 {
     host_dataframe* hdf = get_hdf_instance();
+    bool use_hair_masks = false;
+    for (int cam_idx = 0; cam_idx < total_views_num; ++cam_idx)
+    {
+        if (hdf->imgs_mask_cpu[cam_idx] != nullptr)
+        {
+            use_hair_masks = true;
+            break;
+        }
+    }
 
     std::vector<std::vector<pc_structs::plain>> strands;
     strands.resize(strand_segments_num);
@@ -594,7 +652,8 @@ int run(
             minimum_views_with_valid_2d_direction,
             growing_step_size,
             direction_change_threshold_rad,
-            background_color_threshold
+            background_color_threshold,
+            use_hair_masks
         );
 
         // second tip of the strand
@@ -616,7 +675,8 @@ int run(
             minimum_views_with_valid_2d_direction,
             growing_step_size,
             direction_change_threshold_rad,
-            background_color_threshold
+            background_color_threshold,
+            use_hair_masks
         );
 
 #pragma omp critical
@@ -646,32 +706,15 @@ int run(
 
         for (int v_idx = 0; v_idx < strand.size(); ++v_idx)
         {
-            for (int cam_idx = 0; cam_idx < total_views_num; ++cam_idx)
-            {
-
-                float3 pixel_coord;
-                matvecmul4_hom(hdf->P_cpu[cam_idx], strand[v_idx].position, pixel_coord);
-
-                pixel_coord.x /= pixel_coord.z;
-                pixel_coord.y /= pixel_coord.z;
-
-                if (pixel_coord.y < 0 || pixel_coord.y >= hdf->rows || pixel_coord.x < 0 || pixel_coord.x >= hdf->cols)
-                {
-                    // background_points_num++;
-                    // break;
-                    continue;
-                }
-
-                int pixel_index = (int)(std::floor(pixel_coord.y)) * hdf->cols + (int)(std::floor(pixel_coord.x));
-                float pixel_gray_scale_value = hdf->imgs_gray_cpu[cam_idx][pixel_index];
-
-                if (pixel_gray_scale_value < background_color_threshold)
-                {
-                    background_points_num++;
-                    break;
-                }
-                
-            } // loop over all camera views
+            if (!has_foreground_support(
+                hdf,
+                total_views_num,
+                strand[v_idx].position,
+                minimum_views_with_valid_2d_direction,
+                background_color_threshold,
+                use_hair_masks
+            ))
+                background_points_num++;
 
         } // loop over all strand vertices
 

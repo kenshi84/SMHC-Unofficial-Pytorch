@@ -189,6 +189,16 @@ then binarized using the existing foreground threshold of 0.01. A missing mask
 raises an error when `--use_hair_masks` is enabled. For the legacy
 `input/synth/yuksel/curly` layout, use `--hair_masks mask`.
 
+The growing stage also uses these masks: it ignores orientation samples outside
+the hair region and checks foreground support when extending and filtering
+strands. A point needs support from at least
+`mvhg_minimum_views_with_valid_2d_direction` masked views (default: 6, minimum: 1).
+Only finite, in-frame projections in front of a camera count; disagreements in
+other masks do not veto sufficient support. `mvhg_background_ratio` still sets
+the fraction of unsupported **strand vertices** at which the final check removes
+a strand. Without masks, growing retains the intensity-based background check
+using `mvhg_background_color_threshold`.
+
 To export the final positions and strand lengths to `final.data` and `final.ply`
 in the same directory, with `hairutil` available on `PATH`:
 
@@ -227,7 +237,7 @@ chmod +x run.sh
 The reconstruction behavior is controlled via cfgs/default.yaml. While many parameters follow the original paper's logic, the additional ones are:
 
 **Utilizing masks**
-- `--use_hair_masks` causes the pipeline to execute the LPMVS only on the pixels marked as hair, hence, boosting performance. This however, requires you to provide the hair masks somehow!
+- `--use_hair_masks` restricts LPMVS to hair pixels and uses the masks for direction sampling and foreground checks during multi-view hair growing. A hair mask is required for every input view.
 
 **Step by step run**
 - `--no_lpmvs` skips this step, similarly there are parameters for other steps of the pipeline.

@@ -525,7 +525,7 @@ class SAR:
 
         for idx in range(len(self.dataset.views)):
             # do this to first make sure that all the maps are loaded for the current view
-            img, _, ori2d_map, conf_map, _, _ = self.acquire_image_maps(idx)
+            img, mask, ori2d_map, conf_map, _, _ = self.acquire_image_maps(idx)
             load_image_data_to_dataframe(
                 idx,
                 img.size(0),
@@ -533,7 +533,7 @@ class SAR:
                 img,
                 ori2d_map,
                 conf_map,
-                torch.empty(0),
+                mask,
                 torch.empty(0),
                 load_to_cpu_containers=True,
             )

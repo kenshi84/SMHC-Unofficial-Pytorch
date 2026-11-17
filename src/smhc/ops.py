@@ -392,6 +392,15 @@ def run_multiview_hair_growing(
 ) -> tuple[Float32[Tensor, "X 4"], Float32[Tensor, "X 4"], Float32[Tensor, "Y"]]:
     """Apply multi-view hair growing on the generated strand segments.
 
+    If CPU hair masks have been loaded, orientation samples are restricted to
+    their foreground pixels (mask > 0.01). Growth and final background removal
+    require foreground support from at least
+    params.minimum_views_with_valid_2d_direction masked views (minimum one).
+    Only finite, in-frame projections in front of a camera count as support.
+    Without masks, background checks use params.background_color_threshold.
+    params.background_ratio is the fraction of unsupported vertices at which
+    a strand is removed during the final check.
+
     Args:
         total_views_num (int): total number of input camera views.
         positions (Tensor, with shape [num_points, 4]): input positions of the strand segments.

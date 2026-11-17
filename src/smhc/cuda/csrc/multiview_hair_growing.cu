@@ -7,8 +7,7 @@
 #include <cmath>
 #include <cfloat>
 
-#include <Eigen/Core>
-#include <Eigen/Eigen>
+#include "growing_direction.h"
 
 // added for timing
 #include <iostream>
@@ -156,41 +155,6 @@ inline void calc_cam_center_2d_dir_plane_normal(
 
 
 
-inline Eigen::Vector3d get_smallest_eigen_vector_inverse_iter(Eigen::Matrix3d A)
-{
-    const Eigen::Matrix3d A_inv = A.inverse();
-    // handle the singular case
-    if (!A_inv.allFinite())
-    {
-        return Eigen::Vector3d::Zero();
-    }
-
-    // normalized initial guess
-    Eigen::Vector3d x(1., 1., 1.);
-    x.normalize();
-
-    const double eps = 1e-10; 
-    const int iter_max = 100;
-
-    for (int iter = 0; iter < iter_max; ++iter)
-    {
-        const Eigen::Vector3d x_prev = x;
-
-        // inverse iteration
-        x = A_inv * x;
-        x.normalize();
-
-        // check if vectors are aligned
-        if (std::abs(x.dot(x_prev)) > (1.0 - eps)) 
-        {
-            break;
-        }
-    }
-    
-    return x;
-}
-
-
 void find_valid_3d_growing_direction(
     const host_dataframe* hdf,
     const int total_views_num,
@@ -335,7 +299,7 @@ void find_valid_3d_growing_direction(
         found_dir = false; growing_dir.x = 0.f; growing_dir.y = 0.f; growing_dir.z = 0.f; return;
     }
 
-    // perform the svd for the views with valid direction
+    // Collect the plane constraints from views with a valid direction.
     Eigen::MatrixX3d A(valid_views_cam_idx.size(), 3);
     int valid_views_num = 0;
     for (int v = 0; v < valid_views_cam_idx.size(); ++v)
@@ -356,35 +320,8 @@ void find_valid_3d_growing_direction(
         valid_views_num++;
     }
 
-    // do noise removal iterations
-    // first iteration
-    Eigen::Matrix3d AtA = A.transpose() * A;    // AtA: 3 x 3 matrix
-    Eigen::Vector3d x = get_smallest_eigen_vector_inverse_iter(AtA);
-    if (x == Eigen::Vector3d(0., 0., 0.))
-    {
-        found_dir = false; growing_dir.x = 0.f; growing_dir.y = 0.f; growing_dir.z = 0.f; return;
-    }
-    // watch out for nan values
-    if (x(0) != x(0) || x(1) != x(1) || x(2) != x(2))
-    {
-        found_dir = false; growing_dir.x = 0.f; growing_dir.y = 0.f; growing_dir.z = 0.f; return;
-    }
-    // compute weights squared inverse
-    Eigen::VectorXd weights_si = (A * x).array().square().inverse();
-    // apply row-wise weighting
-    A = A.array().colwise() * weights_si.array();
-    // normalize by the absolute maximum for stability
-    A /= A.array().abs().maxCoeff();
-
-    // second iteration
-    AtA = A.transpose() * A;
-    x = get_smallest_eigen_vector_inverse_iter(AtA);
-    if (x == Eigen::Vector3d(0., 0., 0.))
-    {
-        found_dir = false; growing_dir.x = 0.f; growing_dir.y = 0.f; growing_dir.z = 0.f; return;
-    }
-    // watch out for nan values
-    if (x(0) != x(0) || x(1) != x(1) || x(2) != x(2))
+    const Eigen::Vector3d x = solve_growing_direction(A);
+    if (x.isZero())
     {
         found_dir = false; growing_dir.x = 0.f; growing_dir.y = 0.f; growing_dir.z = 0.f; return;
     }

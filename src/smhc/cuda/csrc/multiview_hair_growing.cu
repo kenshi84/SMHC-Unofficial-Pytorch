@@ -275,7 +275,7 @@ void find_valid_3d_growing_direction(
             }
         }
 
-        if (min_score_angle_idx > 0)
+        if (min_score_angle_idx >= 0)
         {
             float min_score_angle = min_search_angle + min_score_angle_idx * search_cone_angular_resolution_rad;
             valid_views_2d_angle.push_back(min_score_angle);

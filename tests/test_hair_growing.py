@@ -22,12 +22,12 @@ def smhc_module():
         smhc.destroy_dataframe()
 
 
-@pytest.mark.parametrize("scale", [0.001, 1.0, 1000.0])
-@pytest.mark.parametrize(
-    "independent_views", [True, False], ids=["consistent", "parallel"]
-)
-def test_growing_from_multiview_plane_intersections(
-    smhc_module, scale, independent_views
+def grow_horizontal_strand(
+    smhc_module,
+    scale=1.0,
+    independent_views=True,
+    orientation_angle=0.0,
+    confidence_value=10.0,
 ):
     size = 64
     identity = torch.eye(3)
@@ -35,8 +35,8 @@ def test_growing_from_multiview_plane_intersections(
     intrinsics_inverse = torch.linalg.inv(intrinsics)
     # These tensors must stay alive: the growing stage borrows their CPU storage.
     image = torch.ones((size, size))
-    orientation = torch.zeros_like(image)
-    confidence = torch.full_like(image, 10.0)
+    orientation = torch.full_like(image, orientation_angle)
+    confidence = torch.full_like(image, confidence_value)
     camera_offsets = [-0.25, 0.0, 0.25] if independent_views else [0.0] * 3
 
     for camera_id, offset in enumerate(camera_offsets):
@@ -105,10 +105,21 @@ def test_growing_from_multiview_plane_intersections(
     positions = torch.tensor([[-0.01, 0.0, 1.0, 0.0], [0.01, 0.0, 1.0, 0.0]]) * scale
     directions = torch.tensor([[1.0, 0.0, 0.0, 0.0]] * 2)
 
-    grown_positions, grown_directions, counts = smhc_module.run_multiview_hair_growing(
+    return smhc_module.run_multiview_hair_growing(
         params, 3, positions, directions, torch.tensor([2], dtype=torch.int32)
     )
 
+
+@pytest.mark.parametrize("scale", [0.001, 1.0, 1000.0])
+@pytest.mark.parametrize(
+    "independent_views", [True, False], ids=["consistent", "parallel"]
+)
+def test_growing_from_multiview_plane_intersections(
+    smhc_module, scale, independent_views
+):
+    grown_positions, grown_directions, counts = grow_horizontal_strand(
+        smhc_module, scale=scale, independent_views=independent_views
+    )
     expected_x = [-0.015, -0.01, 0.01, 0.015] if independent_views else [-0.01, 0.01]
     assert counts.tolist() == [float(len(expected_x))]
     expected_positions = torch.tensor([[x, 0.0, 1.0] for x in expected_x])
@@ -120,4 +131,42 @@ def test_growing_from_multiview_plane_intersections(
     # cancellation at the smallest scene scale.
     torch.testing.assert_close(
         grown_directions[:, :3].abs(), expected_directions, rtol=1e-5, atol=1e-5
+    )
+
+
+@pytest.mark.parametrize(
+    "angle", [-0.125, 0.125], ids=["first-candidate", "last-candidate"]
+)
+def test_growing_accepts_candidates_at_both_cone_edges(smhc_module, angle):
+    positions, directions, counts = grow_horizontal_strand(
+        smhc_module, orientation_angle=angle
+    )
+
+    assert counts.tolist() == [4.0]
+    growing_direction = torch.tensor([math.cos(angle), math.sin(angle), 0.0])
+    tips = torch.tensor([[-0.01, 0.0, 1.0], [0.01, 0.0, 1.0]])
+    expected_positions = torch.stack(
+        [
+            tips[0] - 0.005 * growing_direction,
+            *tips,
+            tips[1] + 0.005 * growing_direction,
+        ]
+    )
+    torch.testing.assert_close(
+        positions[:, :3], expected_positions, rtol=1e-5, atol=1e-7
+    )
+    torch.testing.assert_close(
+        directions[[0, -1], :3].abs(),
+        growing_direction.abs().repeat(2, 1),
+        rtol=1e-5,
+        atol=1e-5,
+    )
+
+
+def test_growing_stops_when_no_candidate_is_valid(smhc_module):
+    positions, _, counts = grow_horizontal_strand(smhc_module, confidence_value=0.0)
+
+    assert counts.tolist() == [2.0]
+    torch.testing.assert_close(
+        positions[:, :3], torch.tensor([[-0.01, 0.0, 1.0], [0.01, 0.0, 1.0]])
     )

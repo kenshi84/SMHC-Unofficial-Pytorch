@@ -163,11 +163,13 @@ void forward_euler_step(
     const float strand_generation_angle_difference_threshold_rad
 )
 {
+    // Each candidate distance is measured from the same starting position.
+    const float3 search_origin = move_position;
     for (float move_step = strand_generation_step_size;
         move_step < strand_generation_length_threshold;
         move_step += strand_generation_step_size)
     {
-        addscaleout(move_position, move_step, move_direction, move_position);
+        addscaleout(search_origin, move_step, move_direction, move_position);
         std::vector<int> neighbors_indices;
         find_neighboring_points(
             pc,

@@ -176,6 +176,36 @@ the model's left). `head.obj` determines the default depth search range with a
 are optional; `points3D.bin` is not needed by the reconstruction algorithm.
 Existing `calibration.json` datasets remain supported in their original units.
 
+For reconstruction using the hair masks stored in each case's `mask/hair/`:
+
+```bash
+python main.py --dataset_path input/real/20260415/iwata \
+    --output_path output/w_mask/real/20260415/iwata \
+    --use_hair_masks --hair_masks mask/hair
+```
+
+Masks are resized to the input image dimensions with nearest-neighbor sampling,
+then binarized using the existing foreground threshold of 0.01. A missing mask
+raises an error when `--use_hair_masks` is enabled. For the legacy
+`input/synth/yuksel/curly` layout, use `--hair_masks mask`.
+
+To export the final positions and strand lengths to `final.data` and `final.ply`
+in the same directory, with `hairutil` available on `PATH`:
+
+```bash
+python scripts/export_hair.py output/real/20260415/iwata/multiview_hairgrowing
+```
+
+The exporter preserves coordinates, units, and strand order, invokes hairutil with
+`--no-autofix`, and verifies an exact `.data` → `.ply` → `.data` round trip.
+`hairutil_export.json` and `hairutil_export.log` record validation and tool output.
+Repeated exports skip unchanged, successfully converted results.
+
+For a running Cycloud batch, `python scripts/watch_hair_exports.py --batch-dir
+output/_cycloud/<job-name>` waits for each case's completion marker and exports it
+using CPU only. Run this watcher on an instance that remains active until all
+cases finish; its progress is recorded in `<job-name>/export_status.json`.
+
 ### Step 1: Synthetic Data Generation
 Before reconstruction, you can generate the multi-view synthetic dataset using the provided Blender script. This provides 136 viewpoints per model, on a geodesic shell covering mostly the upper hemisphere, at 2048x2048 resolution. Currently .hair, .ply and .bin hair models are supported. For the head model, provide a .ply model and make sure to use a closed (capped) neck on your head model. This prevents the pipeline from reconstructing internal strands that are technically visible through the open hole at the bottom of a standard bust mesh.
 

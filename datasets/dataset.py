@@ -7,6 +7,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from datasets.colmap import is_colmap_dataset, load_colmap_calibration
+from datasets.masks import load_hair_mask
 from utils.camera_utils import Camera
 from utils.gabor import GaborFilterBank
 from utils.graphics_utils import get_plucker_line_coordinates
@@ -221,16 +222,13 @@ class Dataset:
 
                 gt_image_np = gt_image_np * alpha_mask_np
 
-            if os.path.exists(hair_mask_path):
-                hair_mask_np = np.array(
-                    Image.open(hair_mask_path).convert("L"), dtype=np.float32
-                ) * (1.0 / 255.0)
-                hair_mask_np[hair_mask_np > 0.01] = 1.0
-                hair_mask_np[hair_mask_np < 0.01] = 0.0
-            else:
-                if not colmap_input:
-                    print(f"Could not find input hair mask, {hair_mask_path}.")
-                hair_mask_np = np.ones_like(gt_image_np, dtype=np.float32)
+            if not os.path.exists(hair_mask_path) and not colmap_input:
+                print(f"Could not find input hair mask, {hair_mask_path}.")
+            hair_mask_np = load_hair_mask(
+                hair_mask_path,
+                (gt_image_np.shape[1], gt_image_np.shape[0]),
+                required=args.use_hair_masks,
+            )
 
             int_map_file = os.path.join(
                 args.work_path, f"{args.int_maps_dir}/int_map_{u_id:06d}.npy"
@@ -254,7 +252,11 @@ class Dataset:
                     np.array(orig_gt_image.resize(down_sampled_res))
                 )
                 hair_mask = torch.from_numpy(
-                    np.array(orig_hair_mask.resize(down_sampled_res))
+                    np.array(
+                        orig_hair_mask.resize(
+                            down_sampled_res, resample=Image.Resampling.NEAREST
+                        )
+                    )
                 )
 
                 int_map = []

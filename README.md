@@ -239,6 +239,23 @@ The reconstruction behavior is controlled via cfgs/default.yaml. While many para
 **Utilizing masks**
 - `--use_hair_masks` restricts LPMVS to hair pixels and uses the masks for direction sampling and foreground checks during multi-view hair growing. A hair mask is required for every input view.
 
+**LPMVS image matching**
+
+- `--lpmvs_photometric_method zncc` is the default. It subtracts the mean of each
+  set of corresponding image samples before computing their correlation, so
+  brightness offsets do not hide differences in the hair texture.
+- `--lpmvs_zncc_min_variance 0.000001` excludes comparisons where either sampled
+  intensity profile has population variance at or below this threshold. The
+  threshold assumes intensities in `[0, 1]`; lower it to retain fainter texture.
+  Only valid comparisons contribute to the image-cost average. If none remain,
+  the image cost is 1 (the maximum), while the orientation cost still applies.
+- `--lpmvs_photometric_method cosine` selects the previous uncentered score for
+  comparison. The variance threshold does not apply in this mode.
+
+Use a fresh output directory for each comparison to avoid reusing intermediate
+estimates. ZNCC distinguishes inverted low-contrast patterns in regression tests;
+its effect on reconstruction accuracy still needs evaluation on real datasets.
+
 **Step by step run**
 - `--no_lpmvs` skips this step, similarly there are parameters for other steps of the pipeline.
 

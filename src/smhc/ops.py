@@ -209,6 +209,12 @@ def run_lpmvs(
 ]:
     """Line-based patchmatch multi-view stereo (LPMVS).
 
+    The default image score is ZNCC over corresponding samples. Channels below
+    params.zncc_min_variance (population variance of intensities in [0, 1]) are
+    excluded, and only valid neighboring image comparisons are averaged. If
+    none are valid, the image cost is 1, so missing evidence is not a good match.
+    Set params.photometric_method to "cosine" to use the previous image score.
+
     Args:
         img_height (int): resolution of the image in y axis (vertical).
         img_width (int): resolution of the image in x axis (horizontal).
@@ -245,6 +251,8 @@ def run_lpmvs(
         params.sampling_radius,
         params.samples_num,
         params.occlusion_depth_thresh,
+        params.photometric_method == "zncc",
+        params.zncc_min_variance,
         delta_depth_amp,
         delta_dir_amp,
         ref_view_idx,

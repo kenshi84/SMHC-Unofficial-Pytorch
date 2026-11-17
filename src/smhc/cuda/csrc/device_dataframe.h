@@ -78,6 +78,8 @@ namespace solution
         float   sampling_radius{ 0.f };
         int     half_samples_num{ 0 };
         float   occlusion_depth_thresh{ 0.f };
+        bool    use_zncc{ true };
+        float   zncc_min_variance{ 1e-6f };
 
         // line parameters
         float2* direction{ nullptr };

@@ -33,6 +33,8 @@ lpmvs_maximum_depth:               1.4
 lpmvs_sampling_radius:             10.
 lpmvs_samples_num:                 40
 lpmvs_occlusion_depth_thresh:      0.001
+lpmvs_photometric_method:          "zncc" # "cosine" selects the previous image score
+lpmvs_zncc_min_variance:           0.000001 # population variance of intensities in [0, 1]
 
 # line filtering parameters
 line_filtering_position_consistency_thres:                0.001

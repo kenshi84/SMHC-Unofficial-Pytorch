@@ -96,6 +96,7 @@ $PATH_TO_BLENDER -b ./synthetic_scene.blend -P ./render_dataset.py -- --cycles-d
 cd $PROJECT_DIR/datasets/synthetic_data
 CUDA_VISIBLE_DEVICES="$GPU" python load_hair_models.py \
     --input_path $PATH_TO_OUPUT_FOLDER/strands_interpolated.ply \
+    --input_points_per_strand_list strands_interpolated_points_per_strand.npy \
     --cameras_calibration_path $PATH_TO_OUPUT_FOLDER/calibration.json \
     --finest_distance_measure 0.00099 \
     --hair_surface_depth 0.0004 \

@@ -23,6 +23,12 @@ def extract_surface(
     with open(cam_transforms_path) as json_file:
         calib_data = json.load(json_file)
 
+    # Project and save the ground truth in the same world frame used for rendering.
+    if "strands_to_world_rotation" in calib_data:
+        rotation = np.asarray(calib_data["strands_to_world_rotation"], dtype=np.float32)
+        positions = positions @ rotation.T
+        directions = directions @ rotation.T
+
     strands_hom = np.append(
         positions, np.ones((positions.shape[0], 1), dtype=np.float32), axis=1
     )
@@ -179,7 +185,7 @@ def load_hair(args, model_type: str):
         positions = (rot_mat @ positions.T).T
 
     elif model_type == ".bin":
-        positions_scale = 0.001  # this number does look strange, it is emprically set with help of blender
+        positions_scale = 0.001  # CT2Hair stores strand positions in millimeters.
         positions, points_per_strand = load_dot_bin_model(
             args.input_path, positions_scale
         )

@@ -5,9 +5,10 @@ import sys
 
 import bpy
 import numpy as np
+from mathutils import Matrix
 
 # inputs to the script are supposed to be:
-#   1- path to the head model
+#   1- path to the head PLY in millimeters, in the same Y-up frame as the CT2Hair .bin
 #   2- path to save the rendering results
 #   3- images resolution height
 #   4- images resoltuion width
@@ -32,6 +33,10 @@ constant_points_num_per_strand = int(argv[6])
 sys.path.append(argv[7])
 
 import trimesh
+
+
+# Right-handed change of basis: (x, y, z) -> (x, -z, y).
+Y_UP_TO_Z_UP = np.array(((1, 0, 0), (0, 0, -1), (0, 1, 0)), dtype=np.float32)
 
 
 def create_hair(
@@ -117,7 +122,7 @@ if __name__ == "__main__":
 
     cycles_preferences.compute_device_type = "OPTIX"
     bpy.context.scene.cycles.device = "GPU"
-    bpy.context.scene.cycles.use_persistent_data = True
+    bpy.context.scene.render.use_persistent_data = True
 
     # camera views are set based on the vertices of the icosphere
     ico_sphere = bpy.data.objects["icosphere"]
@@ -140,7 +145,8 @@ if __name__ == "__main__":
 
     with open(strands_file, "rb") as f:
         strands_mesh = trimesh.exchange.ply.load_ply(f)
-    strands = strands_mesh["vertices"]
+    # load_hair_models.py has already converted the .bin strand positions to meters.
+    strands = strands_mesh["vertices"] @ Y_UP_TO_Z_UP.T
 
     if os.path.exists(points_per_strand_file):
         with open(points_per_strand_file, "rb") as f:
@@ -167,11 +173,10 @@ if __name__ == "__main__":
         # no slots
         hair_objects.data.materials.append(hair_mat)
 
-    # laod the head model also
     print("Loading the head model ...")
     bpy.ops.wm.ply_import(filepath=head_model_path)
-    head_object_name = (head_model_path.split("/")[-1]).split(".")[0]
-    head_object = bpy.data.objects[head_object_name]
+    head_object = bpy.context.active_object
+    head_object.data.transform(Matrix(0.001 * Y_UP_TO_Z_UP).to_4x4())
     head_mat = bpy.data.materials.get("head_material")
     # head_mat = bpy.data.materials.get("Fresnel_Material")
 
@@ -268,7 +273,10 @@ if __name__ == "__main__":
     json_save_path = os.path.join(output_folder_ds, "calibration.json")
 
     cam_matrices = []
-    camera_calib_dict = {"cameras": []}
+    camera_calib_dict = {
+        "cameras": [],
+        "strands_to_world_rotation": Y_UP_TO_Z_UP.tolist(),
+    }
 
     for i in range(len(ico_vertices)):
 

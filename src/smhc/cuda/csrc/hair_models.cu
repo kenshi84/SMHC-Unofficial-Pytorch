@@ -7,6 +7,8 @@
 // (https://github.com/Jhonve/HairStrandsRendering)
 // Licensed under the MIT License.
 
+#include <cstdint>
+#include <stdexcept>
 #include <sstream>
 #include <vector>
 #include <fstream>
@@ -186,6 +188,56 @@ int load_dot_bin_model_file(
     }
 
     return 0;
+}
+
+void load_dot_data_model_file(
+    const std::string& model_file,
+    const float positions_scale,
+    std::function<float* (size_t)> positions_buffer,
+    std::function<float* (size_t)> points_per_strand_buffer
+)
+{
+    std::ifstream file(model_file, std::ios::binary | std::ios::ate);
+    if (!file)
+        throw std::runtime_error("Cannot open .data hair model " + model_file);
+
+    const std::streamoff file_size = file.tellg();
+    file.seekg(0);
+    std::int32_t num_strands;
+    if (!file.read(reinterpret_cast<char*>(&num_strands), sizeof(num_strands)) || num_strands < 0)
+        throw std::runtime_error("Invalid .data strand count in " + model_file);
+
+    // Apart from the strand count and one point count per strand, every byte belongs to XYZ.
+    constexpr std::streamoff point_size = 3 * sizeof(float);
+    const std::streamoff count_bytes = (static_cast<std::streamoff>(num_strands) + 1) * sizeof(num_strands);
+    const std::streamoff position_bytes = file_size - count_bytes;
+    if (position_bytes < 0 || position_bytes % point_size != 0)
+        throw std::runtime_error("Invalid .data file size in " + model_file);
+
+    const size_t total_points = static_cast<size_t>(position_bytes / point_size);
+    float* positions = positions_buffer(3 * total_points);
+    float* points_per_strand = points_per_strand_buffer(num_strands);
+    size_t points_read = 0;
+    for (std::int32_t strand = 0; strand < num_strands; ++strand)
+    {
+        std::int32_t count;
+        if (!file.read(reinterpret_cast<char*>(&count), sizeof(count)) || count < 0 ||
+            static_cast<size_t>(count) > total_points - points_read)
+            throw std::runtime_error("Invalid .data point count for strand " + std::to_string(strand) + " in " + model_file);
+
+        points_per_strand[strand] = static_cast<float>(count);
+        if (count > 0 && !file.read(reinterpret_cast<char*>(positions + 3 * points_read), count * point_size))
+            throw std::runtime_error("Incomplete .data strand in " + model_file);
+        points_read += count;
+    }
+    if (points_read != total_points)
+        throw std::runtime_error("Unexpected trailing .data coordinates in " + model_file);
+
+    if (positions_scale != 1.0f)
+    {
+        for (size_t i = 0; i < 3 * total_points; ++i)
+            positions[i] *= positions_scale;
+    }
 }
 
 }

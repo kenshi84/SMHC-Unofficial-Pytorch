@@ -138,13 +138,16 @@ chmod +x install.sh
 
 ## 💻 Usage
 ### Step 1: Synthetic Data Generation
-Before reconstruction, you can generate the multi-view synthetic dataset using the provided Blender script. This provides 136 viewpoints per model, on a geodesic shell covering mostly the upper hemisphere, at 2048x2048 resolution. Currently .hair, .ply and .bin hair models are supported. Supply the head mesh as a `.ply` or `.obj` file in millimeters, aligned with the Y-up hair model. Use a closed (capped) neck on the head mesh. This prevents the pipeline from reconstructing internal strands that are technically visible through the open hole at the bottom of a standard bust mesh.
+Before reconstruction, you can generate the multi-view synthetic dataset using the provided Blender script. This provides 136 viewpoints per model, on a geodesic shell covering mostly the upper hemisphere, at 2048x2048 resolution. Supported hair formats are `.hair`, `.ply`, `.bin` and `.data`. The script expects `.bin` and `.data` strand coordinates in millimeters. Supply the head mesh as a `.ply` or `.obj` file in millimeters, aligned with the Y-up hair model. Use a closed (capped) neck on the head mesh. This prevents the pipeline from reconstructing internal strands that are technically visible through the open hole at the bottom of a standard bust mesh.
 
 ```bash
 # 3. Generates multi-view renders and ground truth
 chmod +x render_synthetic_dataset.sh
 ./render_synthetic_dataset.sh <path_to_blender_executable> <path_to_input_hair_model> <path_to_input_head_model> <path_to_output_folder>
 ```
+
+To read a `.data` file directly in Python, use `positions, points_per_strand = smhc.load_dot_data_model("hair.data")`. The XYZ coordinates retain their original order and units. Pass `positions_scale=0.001` to convert millimeters to meters. [hairutil format reference](https://github.com/kenshi84/hairutil/blob/f169e5be40f1b17bac40882cb1c89dc71fe84def/src/io/data.cpp#L12)
+
 ### Step 2: Running Reconstruction
 To start the reconstruction process, you can use the provided run script. This script contains the specific configuration for the synthetic and real-world results above.
 

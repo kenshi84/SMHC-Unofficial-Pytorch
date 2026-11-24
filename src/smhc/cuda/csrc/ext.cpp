@@ -28,5 +28,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 
     m.def("load_dot_hair_model", &solution::load_dot_hair_model);
     m.def("load_dot_bin_model", &solution::load_dot_bin_model);
+    m.def("load_dot_data_model", &solution::load_dot_data_model);
 
 }

@@ -163,6 +163,12 @@ namespace solution
         const float positions_scale
     );
 
+    std::tuple<torch::Tensor, torch::Tensor>
+    load_dot_data_model(
+        const std::string& file_name,
+        const float positions_scale
+    );
+
 }
 
 #endif

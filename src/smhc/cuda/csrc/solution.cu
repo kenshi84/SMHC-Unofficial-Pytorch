@@ -660,4 +660,21 @@ namespace solution
         return std::make_tuple(positions.reshape({-1, 3}), points_per_strand);
     }
 
+    std::tuple<torch::Tensor, torch::Tensor>
+    load_dot_data_model(
+        const std::string& file_name,
+        const float positions_scale
+    )
+    {
+        auto positions = torch::empty({0}, torch::kFloat32);
+        auto points_per_strand = torch::empty({0}, torch::kFloat32);
+        hair_models::load_dot_data_model_file(
+            file_name,
+            positions_scale,
+            resize_functional_float(positions),
+            resize_functional_float(points_per_strand)
+        );
+        return std::make_tuple(positions.reshape({-1, 3}), points_per_strand);
+    }
+
 }

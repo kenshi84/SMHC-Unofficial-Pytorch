@@ -13,6 +13,7 @@ from smhc.ops import (
     generate_strand_segments,
     load_camera_params_to_dataframe,
     load_dot_bin_model,
+    load_dot_data_model,
     load_dot_hair_model,
     load_image_data_to_dataframe,
     load_lpmvs_estimations_to_dataframe,
@@ -46,4 +47,5 @@ __all__ = [
     # loading hair models utils
     "load_dot_hair_model",
     "load_dot_bin_model",
+    "load_dot_data_model",
 ]

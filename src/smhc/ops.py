@@ -528,3 +528,16 @@ def load_dot_bin_model(
     )
 
     return (strands_positions, out_points_per_strand)
+
+
+@check_types
+def load_dot_data_model(
+    file_name: str, positions_scale: float = 1.0
+) -> tuple[Float32[Tensor, "num_points 3"], Float32[Tensor, "num_strands"]]:
+    """Read XYZ positions and per-strand point counts from a hairutil .data file.
+
+    The file starts with an int32 strand count. Each strand stores an int32 point
+    count followed by that many float32 XYZ triples. Positions are returned in
+    file order and multiplied by positions_scale.
+    """
+    return _C.load_dot_data_model(file_name, positions_scale)

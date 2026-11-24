@@ -31,3 +31,4 @@ destroy_dataframe = _make_lazy_cuda_func("destroy_dataframe")
 
 load_dot_hair_model = _make_lazy_cuda_func("load_dot_hair_model")
 load_dot_bin_model = _make_lazy_cuda_func("load_dot_bin_model")
+load_dot_data_model = _make_lazy_cuda_func("load_dot_data_model")

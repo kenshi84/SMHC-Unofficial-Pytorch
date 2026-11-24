@@ -9,7 +9,7 @@ import trimesh.exchange
 from PIL import Image
 from tqdm import tqdm
 
-from smhc import load_dot_bin_model, load_dot_hair_model
+from smhc import load_dot_bin_model, load_dot_data_model, load_dot_hair_model
 
 
 def extract_surface(
@@ -138,8 +138,9 @@ def interpolate_hair_strands(hair_pc, points_num_per_strand, finest_distance_mea
         # else:
         #     vertices_target_num = torch.ceil(max_dist / finest_distance_measure).int().item() * ps
 
-        vertices_target_num = (
-            torch.ceil(diff_sum / finest_distance_measure).int().item()
+        # Keep both endpoints even when a strand is shorter than the target spacing.
+        vertices_target_num = max(
+            2, torch.ceil(diff_sum / finest_distance_measure).int().item()
         )
 
         strand_torch = strand.unsqueeze(0)
@@ -184,11 +185,10 @@ def load_hair(args, model_type: str):
         rot_mat = torch.tensor([[0, -1, 0], [1, 0, 0], [0, 0, 1]], dtype=torch.float32)
         positions = (rot_mat @ positions.T).T
 
-    elif model_type == ".bin":
-        positions_scale = 0.001  # CT2Hair stores strand positions in millimeters.
-        positions, points_per_strand = load_dot_bin_model(
-            args.input_path, positions_scale
-        )
+    elif model_type in (".bin", ".data"):
+        # The synthetic pipeline takes these hair models in millimeters.
+        loader = load_dot_bin_model if model_type == ".bin" else load_dot_data_model
+        positions, points_per_strand = loader(args.input_path, positions_scale=0.001)
 
     elif model_type == ".ply":
         with open(args.input_path, "rb") as f:
@@ -222,7 +222,9 @@ def load_hair(args, model_type: str):
             )
 
     else:
-        raise ValueError("Unknown hair model!")
+        raise ValueError(
+            f"Unsupported hair model extension {model_type!r}. Expected .hair, .bin, .data or .ply."
+        )
 
     (
         interpolated_positions,
@@ -276,28 +278,9 @@ if __name__ == "__main__":
     if not os.path.exists(args.output_model_folder):
         os.makedirs(args.output_model_folder)
 
-    if args.input_path.endswith(".hair"):
-        print("a dot hair model is being loaded ...")
-        strand_points_positions, strand_points_directions = load_hair(
-            args, model_type=".hair"
-        )
-
-    elif args.input_path.endswith(".bin"):
-        print("a dot bin model is being loaded ...")
-        strand_points_positions, strand_points_directions = load_hair(
-            args, model_type=".bin"
-        )
-
-    elif args.input_path.endswith(".ply"):
-        print("a dot ply model is being loaded ...")
-        strand_points_positions, strand_points_directions = load_hair(
-            args, model_type=".ply"
-        )
-
-    else:
-        raise ValueError(
-            "This type of hair model is currently not supported! Supported models are .hair, .bin and .ply"
-        )
+    model_type = os.path.splitext(args.input_path)[1].lower()
+    print(f"Loading hair model from {args.input_path} ...")
+    strand_points_positions, strand_points_directions = load_hair(args, model_type)
 
     if args.extract_hair_surface:
         test_depth_img_path = os.path.join(

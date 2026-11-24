@@ -21,6 +21,13 @@ namespace solution
             std::function<float* (size_t)> positions_buffer,
             std::function<float* (size_t)> points_per_strand_buffer
         );
+
+        void load_dot_data_model_file(
+            const std::string& model_file,
+            const float positions_scale,
+            std::function<float* (size_t)> positions_buffer,
+            std::function<float* (size_t)> points_per_strand_buffer
+        );
     }
 }
 

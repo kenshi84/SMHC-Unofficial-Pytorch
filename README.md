@@ -138,7 +138,7 @@ chmod +x install.sh
 
 ## 💻 Usage
 ### Step 1: Synthetic Data Generation
-Before reconstruction, you can generate the multi-view synthetic dataset using the provided Blender script. This provides 136 viewpoints per model, on a geodesic shell covering mostly the upper hemisphere, at 2048x2048 resolution. Currently .hair, .ply and .bin hair models are supported. For the head model, provide a .ply model and make sure to use a closed (capped) neck on your head model. This prevents the pipeline from reconstructing internal strands that are technically visible through the open hole at the bottom of a standard bust mesh.
+Before reconstruction, you can generate the multi-view synthetic dataset using the provided Blender script. This provides 136 viewpoints per model, on a geodesic shell covering mostly the upper hemisphere, at 2048x2048 resolution. Currently .hair, .ply and .bin hair models are supported. Supply the head mesh as a `.ply` or `.obj` file in millimeters, aligned with the Y-up hair model. Use a closed (capped) neck on the head mesh. This prevents the pipeline from reconstructing internal strands that are technically visible through the open hole at the bottom of a standard bust mesh.
 
 ```bash
 # 3. Generates multi-view renders and ground truth

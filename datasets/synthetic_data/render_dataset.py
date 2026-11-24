@@ -8,7 +8,7 @@ import numpy as np
 from mathutils import Matrix
 
 # inputs to the script are supposed to be:
-#   1- path to the head PLY in millimeters, in the same Y-up frame as the CT2Hair .bin
+#   1- path to the head PLY or OBJ in millimeters, in the same Y-up frame as the CT2Hair .bin
 #   2- path to save the rendering results
 #   3- images resolution height
 #   4- images resoltuion width
@@ -100,6 +100,32 @@ def create_hair(
     return bpy.data.objects[name]
 
 
+def import_head_mesh(filepath):
+    extension = os.path.splitext(filepath)[1].lower()
+    bpy.context.view_layer.objects.active = None
+    if extension == ".ply":
+        bpy.ops.wm.ply_import(filepath=filepath)
+    elif extension == ".obj":
+        # Keep the file coordinates for the shared Y-up to Z-up transform below.
+        bpy.ops.wm.obj_import(
+            filepath=filepath,
+            forward_axis="Y",
+            up_axis="Z",
+            use_split_objects=False,
+            use_split_groups=False,
+        )
+    else:
+        raise ValueError(f"Expected a .ply or .obj head mesh, got {filepath!r}")
+
+    obj = bpy.context.active_object
+    if obj is None or obj.type != "MESH":
+        raise ValueError(f"No head mesh was imported from {filepath!r}")
+    mesh = obj.data
+    mesh.transform(Matrix(0.001 * Y_UP_TO_Z_UP).to_4x4())
+    mesh.materials.clear()
+    mesh.materials.append(bpy.data.materials["head_material"])
+
+
 def create_folder(folder):
     try:
         os.makedirs(folder, exist_ok=True)
@@ -174,18 +200,7 @@ if __name__ == "__main__":
         hair_objects.data.materials.append(hair_mat)
 
     print("Loading the head model ...")
-    bpy.ops.wm.ply_import(filepath=head_model_path)
-    head_object = bpy.context.active_object
-    head_object.data.transform(Matrix(0.001 * Y_UP_TO_Z_UP).to_4x4())
-    head_mat = bpy.data.materials.get("head_material")
-    # head_mat = bpy.data.materials.get("Fresnel_Material")
-
-    if head_object.data.materials:
-        # assign to 1st material slot
-        head_object.data.materials[0] = head_mat
-    else:
-        # no slots
-        head_object.data.materials.append(head_mat)
+    import_head_mesh(head_model_path)
 
     # Scene config
     center = (0.0, 0.0, 0.0)

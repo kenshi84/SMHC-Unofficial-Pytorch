@@ -37,7 +37,12 @@ __global__ void line_filtering_kernel(
 
 	int img_cols = ddf->cols;
 	int img_rows = ddf->rows;
-	int ref_pixel_idx = p.y * img_cols + p.x;
+
+	// Ignore launch padding before accessing any pixel buffers.
+	if (p.x >= img_cols || p.y >= img_rows)
+		return;
+
+    int ref_pixel_idx = p.y * img_cols + p.x;
 	float4 ref_pos = ddf->positions[0][ref_pixel_idx];
 	float4 ref_dir = ddf->directions[0][ref_pixel_idx];
 

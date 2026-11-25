@@ -56,3 +56,10 @@ venv.bak/
 
 # extras
 extras/
+
+input
+input/
+output
+output/
+temp*
+temp/

@@ -36,6 +36,8 @@ namespace solution
             const float sampling_radius,
             const int samples_num,
             const float occulusion_depth_thresh,
+            const bool use_zncc,
+            const float zncc_min_variance,
             // some additional control over the perturbations in the line refinement steps
             const float delta_depth_amp,
             const float deleta_dir_amp,

@@ -1,3 +1,6 @@
+import math
+
+
 class LPMVSHyperParameters:
     def __init__(self, args) -> None:
         self.alpha = args.lpmvs_alpha
@@ -7,6 +10,12 @@ class LPMVSHyperParameters:
         self.sampling_radius = args.lpmvs_sampling_radius
         self.samples_num = args.lpmvs_samples_num
         self.occlusion_depth_thresh = args.lpmvs_occlusion_depth_thresh
+        self.photometric_method = getattr(args, "lpmvs_photometric_method", "zncc")
+        self.zncc_min_variance = float(getattr(args, "lpmvs_zncc_min_variance", 1e-6))
+        if self.photometric_method not in ("zncc", "cosine"):
+            raise ValueError("lpmvs_photometric_method must be 'zncc' or 'cosine'")
+        if not math.isfinite(self.zncc_min_variance) or self.zncc_min_variance < 0:
+            raise ValueError("lpmvs_zncc_min_variance must be finite and non-negative")
 
 
 class LineFilteringHyperParameters:

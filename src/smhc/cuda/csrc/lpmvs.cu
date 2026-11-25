@@ -4,6 +4,7 @@
 
 #include "device_dataframe.h"
 #include "lpmvs.h"
+#include "photometric_consistency.h"
 
 #define EXTRA_POINTS_AXIS_ALIGNED_3_PIXEL_FAR 1
 #define EXTRA_POINTS_AXIS_ALIGNED_5_PIXEL_FAR  1
@@ -149,66 +150,6 @@ __device__ __forceinline__ void find_closest_point_on_l1_to_l2(
     closest_point_world_coord.z = aux2.z;
 }
 
-__device__ __forceinline__ void calc_nvcc_element_float(
-    float* __restrict__ elm1,
-    float* __restrict__ elm2,
-    float* __restrict__ dot_acc,
-    float* __restrict__ norm1_acc,
-    float* __restrict__ norm2_acc
-)
-{
-    (*dot_acc) += (*elm1) * (*elm2);
-    (*norm1_acc) += (*elm1) * (*elm1);
-    (*norm2_acc) += (*elm2) * (*elm2);
-}
-
-
-__device__ __forceinline__ void calc_nvcc_element_float4(
-    float4* __restrict__ elm1,
-    float4* __restrict__ elm2,
-    float4* __restrict__ dot_acc,
-    float4* __restrict__ norm1_acc,
-    float4* __restrict__ norm2_acc
-)
-{
-    (*dot_acc).x += (*elm1).x * (*elm2).x;
-    (*norm1_acc).x += (*elm1).x * (*elm1).x;
-    (*norm2_acc).x += (*elm2).x * (*elm2).x;
-
-    (*dot_acc).y += (*elm1).y * (*elm2).y;
-    (*norm1_acc).y += (*elm1).y * (*elm1).y;
-    (*norm2_acc).y += (*elm2).y * (*elm2).y;
-
-    (*dot_acc).z += (*elm1).z * (*elm2).z;
-    (*norm1_acc).z += (*elm1).z * (*elm1).z;
-    (*norm2_acc).z += (*elm2).z * (*elm2).z;
-}
-
-__device__ __forceinline__ void calc_nvcc_acc_float(
-    float* __restrict__ acc,
-    float* __restrict__ dot_acc,
-    float* __restrict__ norm1_acc,
-    float* __restrict__ norm2_acc
-)
-{
-    *acc = (*dot_acc) / (sqrtf((*norm1_acc) * (*norm2_acc)) + 1e-8);
-}
-
-
-__device__ __forceinline__ void calc_nvcc_acc_float4(
-    float* __restrict__ acc,
-    float4* __restrict__ dot_acc,
-    float4* __restrict__ norm1_acc,
-    float4* __restrict__ norm2_acc
-)
-{
-    float4 aux;
-    aux.x = (*dot_acc).x / (sqrtf((*norm1_acc).x * (*norm2_acc).x) + 1e-8);
-    aux.y = (*dot_acc).y / (sqrtf((*norm1_acc).y * (*norm2_acc).y) + 1e-8);
-    aux.z = (*dot_acc).z / (sqrtf((*norm1_acc).z * (*norm2_acc).z) + 1e-8);
-    (*acc) = (aux.x + aux.y + aux.z) / 3.f;
-}
-
 __device__ __forceinline__ bool is_visible_in_neighboring_view(
     const float px,
     const float py,
@@ -287,6 +228,7 @@ __device__ __forceinline__ float multiview_cost(
     float cost_geometric = 0.0f;
     float sum_of_gamma = 1e-8f;
     float cost_image = 0.0f;
+    int valid_image_neighbors = 0;
     float num_neighbor = ddf->view_selection_subset_number + 1e-8f;
 
     // results of atanf will be in radians, in the interval [-pi / 2, pi / 2]
@@ -316,11 +258,6 @@ __device__ __forceinline__ float multiview_cost(
     float neighbor_angle;
     int idx_neighbor;
     float img_cost;
-
-    // variables for computing NCC
-    T dot_acc;
-    T norm1_acc;
-    T norm2_acc;
 
     // computing cost for the neighboring views
     for (int j = 0; j < ddf->view_selection_subset_number; j++)
@@ -355,20 +292,7 @@ __device__ __forceinline__ float multiview_cost(
 
         cost = 0.f;
         confidence_sum = 0.f;
-        img_cost = 0.f;
-        if constexpr (sizeof(T) == sizeof(float))
-        {
-            dot_acc = 0.f;
-            norm1_acc = 0.f;
-            norm2_acc = 0.f;
-        }
-        else if constexpr (sizeof(T) == sizeof(float4))
-        {
-            dot_acc.x = dot_acc.y = dot_acc.z = dot_acc.w = 0.f;
-            norm1_acc.x = norm1_acc.y = norm1_acc.z = norm1_acc.w = 0.f;
-            norm2_acc.x = norm2_acc.y = norm2_acc.z = norm2_acc.w = 0.f;
-        }
-        // else : error, unknown type T
+        PhotometricCorrelation<T> image_correlation;
 
         plucker_line_project_to_2d(reverse_dir,
             reverse_momentum_depth,
@@ -425,21 +349,7 @@ __device__ __forceinline__ float multiview_cost(
                 T img_val = tex2D<T>(ddf->imgs[j + 1], pixel_coord.x + 0.5f, pixel_coord.y + 0.5f);
                 T ref_img_val = tex2D<T>(ddf->imgs[0], x + 0.5f, y + 0.5f);
 
-                if constexpr (sizeof(T) == sizeof(float))
-                calc_nvcc_element_float(
-                    (float*)&ref_img_val,
-                    (float*)&img_val,
-                    (float*)&dot_acc,
-                    (float*)&norm1_acc,
-                    (float*)&norm2_acc);
-                else if constexpr (sizeof(T) == sizeof(float4))
-                    calc_nvcc_element_float4(
-                        (float4*)&ref_img_val,
-                        (float4*)&img_val,
-                        (float4*)&dot_acc,
-                        (float4*)&norm1_acc,
-                        (float4*)&norm2_acc);
-                // else : error, unknown type T
+                image_correlation.add(ref_img_val, img_val, ddf->use_zncc);
 
                 cost += angle_difference(ori, neighbor_angle) * conf;
                 confidence_sum += conf;
@@ -455,33 +365,29 @@ __device__ __forceinline__ float multiview_cost(
 
         cost /= (confidence_sum + 1e-8);
 
-        if constexpr (sizeof(T) == sizeof(float))
-            calc_nvcc_acc_float(
-                &img_cost,
-                (float*)&dot_acc,
-                (float*)&norm1_acc,
-                (float*)&norm2_acc);
-        else if constexpr (sizeof(T) == sizeof(float4))
-            calc_nvcc_acc_float4(
-                &img_cost,
-                (float4*)&dot_acc,
-                (float4*)&norm1_acc,
-                (float4*)&norm2_acc);
-        // else : error, unknown type T
-
-        // Flip ncc value range [-1, 1] to [1, 0]
-        img_cost *= -0.5f;
-        img_cost += 0.5f;
-
+        if (image_correlation.correlation(ddf->use_zncc, ddf->zncc_min_variance, img_cost))
+        {
+            // Map correlation [-1, 1] to a cost [1, 0].
+            cost_image += 0.5f * (1.f - img_cost);
+            ++valid_image_neighbors;
+        }
         cost_geometric += cost;
-        cost_image += img_cost;
 
         sum_of_gamma += 1.f;
         
     }
 
     cost_geometric /= sum_of_gamma;
-    cost_image /= num_neighbor;
+    if (ddf->use_zncc)
+    {
+        // Flat, masked, and occluded comparisons cannot make a hypothesis look
+        // better simply by reducing the number of contributing image costs.
+        cost_image = valid_image_neighbors > 0 ? cost_image / valid_image_neighbors : 1.f;
+    }
+    else
+    {
+        cost_image /= num_neighbor;
+    }
 
     float total_cost = ((1 - ddf->alpha) * cost_geometric + ddf->alpha * cost_image);
 
@@ -1178,6 +1084,8 @@ int run(
     const float sampling_radius,
     const int samples_num,
     const float occulusion_depth_thresh,
+    const bool use_zncc,
+    const float zncc_min_variance,
     // some additional control over the perturbations in the line refinement steps
     const float delta_depth_amp,
     const float deleta_dir_amp,
@@ -1194,6 +1102,9 @@ int run(
     const bool verbose
 )
 {
+    if (!std::isfinite(zncc_min_variance) || zncc_min_variance < 0.f)
+        throw std::invalid_argument("zncc_min_variance must be finite and non-negative");
+
     cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
     device_dataframe* ddf = get_ddf_instance();
 
@@ -1205,6 +1116,8 @@ int run(
     ddf->sampling_radius = sampling_radius;
     ddf->half_samples_num = (samples_num / 2);
     ddf->occlusion_depth_thresh = occulusion_depth_thresh;
+    ddf->use_zncc = use_zncc;
+    ddf->zncc_min_variance = zncc_min_variance;
     
     ddf->id_ref = ref_view_id;
     ddf->view_selection_subset_number = view_selection_subset_number;

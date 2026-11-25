@@ -243,13 +243,16 @@ int run(
         float precision;
         float recall;
 
+        // Public thresholds are in degrees; angular comparisons use radians.
+        const float angle_threshold_rad = direction_thresholds[i] * static_cast<float>(M_PI / 180.0);
+
         // evaluating for gt particles results in recall
         evaluate_for_particle_set(gt_particles, 
             estimated_particles, 
             gt_particles_num, 
             estimated_points_num, 
             position_thresholds[i], 
-            direction_thresholds[i], 
+            angle_threshold_rad,
             recall,
             verbose
         );
@@ -260,12 +263,15 @@ int run(
             estimated_points_num, 
             gt_particles_num, 
             position_thresholds[i], 
-            direction_thresholds[i], 
+            angle_threshold_rad,
             precision,
             verbose
         );
 
-        float f_score = 2 * (precision * recall) / (precision + recall);
+        const float precision_recall_sum = precision + recall;
+        const float f_score = precision_recall_sum > 0.f
+            ? 2.f * (precision * recall) / precision_recall_sum
+            : 0.f;
         printf("for radius range: %.4f, \t angle range: %.4f, \t precision: %.4f, \t recall: %.4f, \t f_score:%.4f\n",
             position_thresholds[i], direction_thresholds[i], precision, recall, f_score);
 

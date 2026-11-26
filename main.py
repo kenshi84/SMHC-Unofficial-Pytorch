@@ -76,7 +76,7 @@ def main(args):
     # saving the parameters configuration for this run
     save_cfg(path=f"{args.output_path}/cfg.yaml", args=args)
 
-    dataset = Dataset(args)
+    dataset = Dataset(args, extension=args.extension)
     sar = SAR(dataset, args)
 
     # running lpmvs
@@ -113,6 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_path", default="", type=str)
     parser.add_argument("--output_path", default="", type=str)
 
+    parser.add_argument("--extension", default=".jpg", type=str, help="File extension for input images")
     parser.add_argument("--hair_masks", default="hair", type=str)
     parser.add_argument("--initial_depth_maps", default="", type=str)
     parser.add_argument("--use_hair_masks", action="store_true", default=False)

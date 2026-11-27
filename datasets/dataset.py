@@ -109,7 +109,7 @@ class Dataset:
                     args.dataset_path, f"depth/depth_{u_id:05d}.npy"
                 )
                 hair_mask_path = os.path.join(
-                    args.dataset_path, f"hair/{imgs_name_prefix}{u_id:05d}.png"
+                    args.dataset_path, args.hair_masks, f'{imgs_name_prefix}{u_id:05d}.png'
                 )
                 body_mask_path = os.path.join(
                     args.dataset_path, f"body/{imgs_name_prefix}{u_id:05d}.png"
@@ -124,7 +124,7 @@ class Dataset:
                     args.dataset_path, f"depth/depth_{u_id:06d}.npy"
                 )
                 hair_mask_path = os.path.join(
-                    args.dataset_path, f"hair/{imgs_name_prefix}{u_id:06d}.png"
+                    args.dataset_path, args.hair_masks, f'{imgs_name_prefix}{u_id:06d}.png'
                 )
                 body_mask_path = os.path.join(
                     args.dataset_path, f"body/{imgs_name_prefix}{u_id:06d}.png"
@@ -139,7 +139,7 @@ class Dataset:
                     args.dataset_path, f"depth/depth_{u_id:04d}.npy"
                 )
                 hair_mask_path = os.path.join(
-                    args.dataset_path, f"hair/{imgs_name_prefix}{u_id:04d}.png"
+                    args.dataset_path, args.hair_masks, f'{imgs_name_prefix}{u_id:04d}.png'
                 )
                 body_mask_path = os.path.join(
                     args.dataset_path, f"body/{imgs_name_prefix}{u_id:04d}.png"
